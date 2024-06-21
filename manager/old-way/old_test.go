@@ -1,23 +1,21 @@
 package main
 
 import (
-	"fmt"
 	"sync"
+	"testing"
 )
 
-// 多携程
-func main() {
-
+func TestMultGoroutine(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		fmt.Println("i like go 1")
+		t.Log("i like go 1")
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			fmt.Println("i like go 2")
+			t.Log("i like go 2")
 		}()
 	}()
 
