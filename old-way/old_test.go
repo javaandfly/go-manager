@@ -3,11 +3,10 @@ package main
 import (
 	"fmt"
 	"sync"
+	"testing"
 )
 
-// 多携程
-func main() {
-
+func TestMultGoroutine(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)
