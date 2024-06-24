@@ -36,20 +36,24 @@ func NewNode(parentNode *StateManagerNode, doFunc GoFunction) *StateManagerNode 
 }
 
 func (node *StateManagerNode) Do() {
+	defer func() {
+		if node.parentNode != nil {
+			node.parentNode.runningCount.Add(-1)
+			if node.parentNode.runningCount.Load() == 0 {
+				node.parentNode.signChan <- struct{}{}
+			}
+		}
+	}()
 	for _, next := range node.nextNode {
 		go func(newNode *StateManagerNode) {
-			defer func() {
-				node.runningCount.Add(-1)
-				if node.runningCount.Load() == 0 {
-					node.signChan <- struct{}{}
-				}
-			}()
 			newNode.Do()
 		}(next)
 	}
 	node.doFunc()
 
-	<-node.signChan
+	if node != nil && len(node.nextNode) != 0 {
+		<-node.signChan
+	}
 
 }
 
