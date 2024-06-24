@@ -1,6 +1,8 @@
 package manager
 
-import "sync"
+import (
+	"sync/atomic"
+)
 
 type GoStatus uint8
 type GoFunction func()
@@ -14,40 +16,47 @@ const (
 
 // 协程状态树
 type StateManagerNode struct {
-	nextNode      []*StateManagerNode
-	mutex         sync.Mutex
-	childNodesLen int
-	status        GoStatus
-	exitChan      chan struct{}
-	doFunc        GoFunction
+	parentNode   *StateManagerNode
+	nextNode     []*StateManagerNode
+	runningCount atomic.Int64
+	status       GoStatus
+	signChan     chan struct{}
+	doFunc       GoFunction
 }
 
-func NewNode(doFunc GoFunction) *StateManagerNode {
+func NewNode(parentNode *StateManagerNode, doFunc GoFunction) *StateManagerNode {
 	return &StateManagerNode{
-		nextNode:      make([]*StateManagerNode, 0),
-		childNodesLen: 0,
-		mutex:         sync.Mutex{},
-		status:        Createing,
-		exitChan:      make(chan struct{}),
-		doFunc:        doFunc,
+		nextNode:     make([]*StateManagerNode, 0),
+		parentNode:   parentNode,
+		runningCount: atomic.Int64{},
+		status:       Createing,
+		signChan:     make(chan struct{}),
+		doFunc:       doFunc,
 	}
 }
 
 func (node *StateManagerNode) Do() {
-	go func() {
-		defer func() {
-			node.status = Stop
-		}()
-		node.doFunc()
-	}()
+	for _, next := range node.nextNode {
+		go func(newNode *StateManagerNode) {
+			defer func() {
+				node.runningCount.Add(-1)
+				if node.runningCount.Load() == 0 {
+					node.signChan <- struct{}{}
+				}
+			}()
+			newNode.Do()
+		}(next)
+	}
+	node.doFunc()
+
+	<-node.signChan
+
 }
 
 func (node *StateManagerNode) RegisterNode(newNode ...*StateManagerNode) {
-	node.mutex.Lock()
-	defer node.mutex.Unlock()
 
 	node.nextNode = append(node.nextNode, newNode...)
 
-	node.childNodesLen = len(node.nextNode)
+	node.runningCount.Add(1)
 
 }
