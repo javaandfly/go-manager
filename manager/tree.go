@@ -49,7 +49,9 @@ func (node *StateManagerNode) Do() {
 			newNode.Do()
 		}(next)
 	}
-	node.doFunc()
+	if node.doFunc != nil {
+		node.doFunc()
+	}
 
 	if node != nil && len(node.nextNode) != 0 {
 		<-node.signChan
